@@ -8,7 +8,25 @@
 
 {-# LANGUAGE GADTs, FlexibleInstances, UndecidableInstances, StandaloneDeriving, TypeApplications, ScopedTypeVariables, OverloadedStrings, LambdaCase #-}
 {-# LANGUAGE TupleSections, RecursiveDo, ViewPatterns, GeneralizedNewtypeDeriving #-}
-module Forth where
+module Forth
+( Val
+, castE
+, push
+, pop
+, popE
+, pushDict
+, LiftW(..)
+, Dict
+, parseTokens
+, executeForthStack
+, compileForth
+, runForth
+, runForthT
+, execForth
+, loadForth
+, addWords
+, libPath
+) where
 
 import Data.Typeable
 import Data.Map (Map)
@@ -27,13 +45,16 @@ import Data.Char (toLower)
 import Control.Monad.Fix
 import Control.Monad
 
+import Paths_forth_hs
+
 import qualified Data.Vector as V
 
 import Debug.Trace
 
 data Val = forall a . (Typeable a, Show a) => Val a
 
-deriving instance Show Val
+instance Show Val where
+  show (Val x) = show x
 
 type Stack = [Val]
 
@@ -202,8 +223,8 @@ compileForth ts = do
   executeForthStack . reverse <$> getDict
 
 replaceElem :: Int -> a -> [a] -> [a]
-replaceElem i x xs = y ++ x : ys
-  where (y,_:ys) = splitAt i xs
+replaceElem i x xs = ys ++ x : drop 1 zs
+  where (ys,zs) = splitAt i xs
 
 defaultDict :: Monad m => Dict m
 defaultDict = Map.fromList $ map (second (,False))
@@ -240,3 +261,6 @@ loadForth = liftIO . T.readFile >=> execForth
 
 addWords :: Monad m => Dict m -> ForthT m ()
 addWords d = modifyDict $ Map.union d
+
+libPath :: MonadIO m => m FilePath
+libPath = liftIO getDataDir

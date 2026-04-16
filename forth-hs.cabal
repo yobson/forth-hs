@@ -6,6 +6,8 @@ author:          James Hobson
 maintainer:      james@hobson.space
 build-type:      Simple
 extra-doc-files: CHANGELOG.md
+data-dir: lib
+data-files: *.fs
 
 common warnings
     ghc-options: -Wall
@@ -13,6 +15,7 @@ common warnings
 library
     import:           warnings
     exposed-modules:  Forth
+    other-modules:    Paths_forth_hs
     build-depends:    base, containers, attoparsec, text, mtl, vector
     hs-source-dirs:   src
     default-language: Haskell2010
