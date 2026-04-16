@@ -8,7 +8,7 @@
 
 {-# LANGUAGE GADTs, FlexibleInstances, UndecidableInstances, StandaloneDeriving, TypeApplications, ScopedTypeVariables, OverloadedStrings, LambdaCase #-}
 {-# LANGUAGE TupleSections, RecursiveDo, ViewPatterns, GeneralizedNewtypeDeriving #-}
-module HForth where
+module Forth where
 
 import Data.Typeable
 import Data.Map (Map)
@@ -25,7 +25,6 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Char (toLower)
 import Control.Monad.Fix
-import Control.Monad.Reader
 import Control.Monad
 
 import qualified Data.Vector as V
