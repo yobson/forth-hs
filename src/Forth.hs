@@ -26,6 +26,8 @@ module Forth
 , loadForth
 , addWords
 , libPath
+, stackAssert
+, getStack
 ) where
 
 import Data.Typeable
@@ -80,8 +82,9 @@ modifyProg f = modify (\(s,p,d) -> (s,f p,d))
 modifyDict :: Monad m => (Dict m -> Dict m) -> ForthT m ()
 modifyDict f = modify (\(s,p,d) -> (s,p,f d))
 
-getsStack :: Monad m => ForthT m Stack
+getsStack, getStack :: Monad m => ForthT m Stack
 getsStack = gets (\(s,_,_) -> s)
+getStack = getsStack
 
 getsProg :: Monad m => ForthT m [Token]
 getsProg = gets (\(_,p,_) -> p)
@@ -247,10 +250,10 @@ setVal = do
   len <- length <$> getsProg
   modifyProg (replaceElem (len - 1 - fromIntegral addr) (Number x))
 
-runForthT :: Monad m => ForthT m () -> m (Either String Stack)
-runForthT (ForthT fs) = runExceptT $ (\(s,_,_) -> s) <$> execStateT fs ([],[], defaultDict)
+runForthT :: Monad m => ForthT m a -> m (Either String a)
+runForthT (ForthT fs) = runExceptT $ evalStateT fs ([],[], defaultDict)
 
-runForth :: Forth () -> Either String Stack
+runForth :: Forth a -> Either String a
 runForth = runIdentity . runForthT
 
 execForth :: MonadFix m => Text -> ForthT m ()
@@ -264,3 +267,9 @@ addWords d = modifyDict $ Map.union d
 
 libPath :: MonadIO m => m FilePath
 libPath = liftIO getDataDir
+
+stackAssert :: Monad m => (Stack -> Bool) -> ForthT m ()
+stackAssert p = do
+  test <- p <$> getStack
+  unless test $ throwError "Stack assertion failed"
+  pure ()
