@@ -1,6 +1,6 @@
 cabal-version:   3.12
 name:            forth-hs
-version:         0.1.0.0
+version:         0.2.0.0
 license:         GPL-3.0-or-later
 author:          James Hobson
 maintainer:      james@hobson.space
