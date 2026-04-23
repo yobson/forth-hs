@@ -13,5 +13,10 @@
 
     packages.default = pkgs.haskellPackages.callCabal2nix "forth-hs" ./. {} ;
 
+    devShells.default = pkgs.haskellPackages.shellFor {
+        packages = p: [self.packages.${system}.default ];
+        nativeBuildInputs = with pkgs; [ cabal-install haskell-language-server ];
+    };
+
   });
 }

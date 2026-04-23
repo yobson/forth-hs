@@ -7,7 +7,8 @@
 -}
 
 {-# LANGUAGE GADTs, FlexibleInstances, UndecidableInstances, StandaloneDeriving, TypeApplications, ScopedTypeVariables, OverloadedStrings, LambdaCase #-}
-{-# LANGUAGE TupleSections, RecursiveDo, ViewPatterns, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TupleSections, RecursiveDo, ViewPatterns, GeneralizedNewtypeDeriving, DataKinds #-}
+{-# LANGUAGE TypeOperators, FlexibleContexts, MultiParamTypeClasses #-}
 module Forth
 ( Val
 , castE
@@ -16,6 +17,7 @@ module Forth
 , popE
 , pushDict
 , LiftW(..)
+, liftW
 , Dict
 , parseTokens
 , executeForthStack
@@ -46,6 +48,8 @@ import qualified Data.Text.IO as T
 import Data.Char (toLower)
 import Control.Monad.Fix
 import Control.Monad
+import Data.Function.Reverse
+import Data.Coerce
 
 import Paths_forth_hs
 
@@ -118,15 +122,18 @@ popE :: (Typeable a, Monad m) => ForthT m a
 popE = pop >>= castE
 
 class LiftW a where
-  liftW :: Monad m => a -> FWord m
+  liftWRev :: Monad m => a -> FWord m
 
-instance (Show a, Typeable a) => LiftW a where
-  liftW = push
+instance (Show a, Typeable a, IsFun a ~ False) => LiftW a where
+  liftWRev = push
 
 instance {-# OVERLAPPING #-} (Typeable a, LiftW r) => LiftW (a -> r) where
-  liftW f = do
+  liftWRev f = do
     x <- popE @a
-    liftW (f x)
+    liftWRev (f x)
+
+liftW :: (LiftW (ReversedArgs a), Monad m, IsFun a ~ True, ReverseArgs (BoxResult a), Coercible a (BoxResult a), Coercible (ReversedArgs a) (BoxResult (ReversedArgs a)), ReversedArgs (BoxResult a) ~ BoxResult (ReversedArgs a)) => a -> ForthT m ()
+liftW = liftWRev . reverseArgs
 
 type Dict m = Map Ident (FWord m, Bool)
 
@@ -232,7 +239,7 @@ replaceElem i x xs = ys ++ x : drop 1 zs
 defaultDict :: Monad m => Dict m
 defaultDict = Map.fromList $ map (second (,False))
   [ ("+", liftW ((+) @Integer))
-  , ("-", liftW (flip ((-) @Integer)))
+  , ("-", liftW ((-) @Integer))
   , ("=", liftW ((==) @Integer))
   , ("dup", do { (Val x) <- pop ; push x ; push x} )
   , ("swap", do {(Val a) <- pop ; (Val b) <- pop ; push a ; push b})
