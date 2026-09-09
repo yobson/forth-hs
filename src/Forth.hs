@@ -7,8 +7,7 @@
 -}
 
 {-# LANGUAGE GADTs, FlexibleInstances, UndecidableInstances, StandaloneDeriving, TypeApplications, ScopedTypeVariables, OverloadedStrings, LambdaCase #-}
-{-# LANGUAGE TupleSections, RecursiveDo, ViewPatterns, GeneralizedNewtypeDeriving, DataKinds #-}
-{-# LANGUAGE TypeOperators, FlexibleContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE TupleSections, RecursiveDo, ViewPatterns, GeneralizedNewtypeDeriving, TypeFamilies, DataKinds, TypeOperators #-}
 module Forth
 ( Val
 , castE
@@ -17,7 +16,6 @@ module Forth
 , popE
 , pushDict
 , LiftW(..)
-, liftW
 , Dict
 , parseTokens
 , executeForthStack
@@ -48,8 +46,6 @@ import qualified Data.Text.IO as T
 import Data.Char (toLower)
 import Control.Monad.Fix
 import Control.Monad
-import Data.Function.Reverse
-import Data.Coerce
 
 import Paths_forth_hs
 
@@ -122,18 +118,55 @@ popE :: (Typeable a, Monad m) => ForthT m a
 popE = pop >>= castE
 
 class LiftW a where
-  liftWRev :: Monad m => a -> FWord m
+  liftW :: Monad m => a -> FWord m
 
-instance (Show a, Typeable a, IsFun a ~ False) => LiftW a where
-  liftWRev = push
+instance {-# OVERLAPPABLE #-} (Show a, Typeable a) => LiftW a where
+  liftW = push
 
 instance {-# OVERLAPPING #-} (Typeable a, LiftW r) => LiftW (a -> r) where
-  liftWRev f = do
+  liftW f = do
     x <- popE @a
-    liftWRev (f x)
+    liftW (f x)
 
-liftW :: (LiftW (ReversedArgs a), Monad m, IsFun a ~ True, ReverseArgs (BoxResult a), Coercible a (BoxResult a), Coercible (ReversedArgs a) (BoxResult (ReversedArgs a)), ReversedArgs (BoxResult a) ~ BoxResult (ReversedArgs a)) => a -> ForthT m ()
-liftW = liftWRev . reverseArgs
+instance {-# OVERLAPPING #-} (Typeable a, Typeable b, LiftW r) => LiftW (a -> b -> r) where
+  liftW f = do
+    y <- popE @b
+    x <- popE @a
+    liftW (f x y)
+
+instance {-# OVERLAPPING #-} (Typeable a, Typeable b, Typeable c, LiftW r) => LiftW (a -> b -> c -> r) where
+  liftW f = do
+    z <- popE @c
+    y <- popE @b
+    x <- popE @a
+    liftW (f x y z)
+
+instance {-# OVERLAPPING #-} (Typeable a, Typeable b, Typeable c, Typeable d, LiftW r) => LiftW (a -> b -> c -> d -> r) where
+  liftW f = do
+    x₁ <- popE @d
+    z <- popE @c
+    y <- popE @b
+    x <- popE @a
+    liftW (f x y z x₁)
+
+instance {-# OVERLAPPING #-} (Typeable a, Typeable b, Typeable c, Typeable d, Typeable e, LiftW r) => LiftW (a -> b -> c -> d -> e -> r) where
+  liftW f = do
+    y₁ <- popE @e
+    x₁ <- popE @d
+    z <- popE @c
+    y <- popE @b
+    x <- popE @a
+    liftW (f x y z x₁ y₁)
+
+instance {-# OVERLAPPING #-} (Typeable a, Typeable b, Typeable c, Typeable d, Typeable e, Typeable f, LiftW r) => LiftW (a -> b -> c -> d -> e -> f -> r) where
+  liftW f = do
+    z₁ <- popE @f
+    y₁ <- popE @e
+    x₁ <- popE @d
+    z <- popE @c
+    y <- popE @b
+    x <- popE @a
+    liftW (f x y z x₁ y₁ z₁)
 
 type Dict m = Map Ident (FWord m, Bool)
 
@@ -241,7 +274,7 @@ defaultDict = Map.fromList $ map (second (,False))
   [ ("+", liftW ((+) @Integer))
   , ("-", liftW ((-) @Integer))
   , ("=", liftW ((==) @Integer))
-  , ("dup", do { (Val x) <- pop ; push x ; push x} )
+  , ("dup",  do { (Val x) <- pop ; push x ; push x} )
   , ("swap", do {(Val a) <- pop ; (Val b) <- pop ; push a ; push b})
   , ("over", do {(Val a) <- pop ; (Val b) <- pop ; push b ; push a ; push b})
   , (",",  popE >>= pushDict . Number)
